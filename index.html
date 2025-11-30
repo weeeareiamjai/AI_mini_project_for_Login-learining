@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Medical Assistant</title>
+    
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Kanit -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#38bdf8', // Sky 400
+                        primaryDark: '#0ea5e9', // Sky 500
+                        secondary: '#f1f5f9', // Slate 100
+                        textMain: '#334155', // Slate 700
+                    },
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-bubble {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 1rem;
+            position: relative;
+            line-height: 1.5;
+        }
+        .chat-user {
+            background-color: #38bdf8;
+            color: white;
+            border-bottom-right-radius: 4px;
+            margin-left: auto;
+        }
+        .chat-ai {
+            background-color: #e2e8f0;
+            color: #334155;
+            border-bottom-left-radius: 4px;
+            margin-right: auto;
+        }
+        
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #38bdf8;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 50;
+        }
+        .toast {
+            min-width: 300px;
+            background: white;
+            border-left: 4px solid #38bdf8;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            animation: slideIn 0.3s ease-out forwards;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="text-textMain h-screen flex overflow-hidden">
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm z-10 shrink-0">
+        <div class="p-6 flex items-center gap-3 border-b border-slate-100">
+            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primaryDark">
+                <i class="fa-solid fa-heart-pulse text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg text-slate-800">AI Medical</h1>
+                <p class="text-xs text-slate-400">Assistant System</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="showSection('dashboard')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-slate-500 rounded-xl hover:bg-secondary hover:text-primaryDark transition-all active-nav" id="nav-dashboard">
+                <i class="fa-solid fa-chart-pie w-5"></i>
+                <span>ภาพรวม (Dashboard)</span>
+            </button>
+            <button onclick="showSection('analyze')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-slate-500 rounded-xl hover:bg-secondary hover:text-primaryDark transition-all" id="nav-analyze">
+                <i class="fa-solid fa-microscope w-5"></i>
+                <span>วิเคราะห์ภาพ (AI)</span>
+            </button>
+            <button onclick="showSection('chat')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-slate-500 rounded-xl hover:bg-secondary hover:text-primaryDark transition-all" id="nav-chat">
+                <i class="fa-solid fa-user-doctor w-5"></i>
+                <span>ปรึกษาหมอ (Chat)</span>
+            </button>
+            <button onclick="showSection('patient')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-slate-500 rounded-xl hover:bg-secondary hover:text-primaryDark transition-all" id="nav-patient">
+                <i class="fa-solid fa-hospital-user w-5"></i>
+                <span>ข้อมูลผู้ป่วย (Search)</span>
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-slate-100">
+            <div class="bg-blue-50 p-4 rounded-xl">
+                <div class="flex items-center gap-2 text-primaryDark mb-2">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span class="font-semibold text-sm">สถานะระบบ</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="status-dot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                    <span class="text-xs text-slate-500" id="api-status">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8 relative">
+        
+        <!-- SECTION 1: DASHBOARD -->
+        <section id="dashboard" class="page-section fade-in">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">ภาพรวมข้อมูลผู้ป่วย</h2>
+            
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Card 1 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-500 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-sm">ผู้ป่วยทั้งหมด</p>
+                        <h3 class="text-2xl font-bold text-slate-700" id="stat-total">...</h3>
+                    </div>
+                </div>
+                
+                <!-- Card 2 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-500 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-cake-candles"></i>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-sm">อายุเฉลี่ย</p>
+                        <h3 class="text-2xl font-bold text-slate-700" id="stat-age">...</h3>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-500 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-notes-medical"></i>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-sm">กลุ่มโรคสูงสุด</p>
+                        <h3 class="text-lg font-bold text-slate-700 truncate w-32" id="stat-top-disease">...</h3>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-500 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-check-circle"></i>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-sm">ความพร้อมระบบ</p>
+                        <h3 class="text-2xl font-bold text-slate-700">100%</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts / Details -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-lg mb-4 text-slate-700">สถิติกลุ่มโรค (Medical Conditions)</h3>
+                    <div id="conditions-list" class="space-y-3">
+                        <!-- Dynamic Content -->
+                        <div class="animate-pulse h-20 bg-slate-100 rounded-xl"></div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-lg mb-4 text-slate-700">สัดส่วนเพศ (Gender)</h3>
+                    <div class="flex items-center justify-center h-48 gap-8" id="gender-stats">
+                         <!-- Dynamic Content -->
+                         <div class="text-center">
+                            <i class="fa-solid fa-mars text-4xl text-blue-400 mb-2"></i>
+                            <p class="font-bold text-xl" id="stat-male">...</p>
+                            <p class="text-xs text-slate-400">ชาย</p>
+                         </div>
+                         <div class="w-px h-20 bg-slate-200"></div>
+                         <div class="text-center">
+                            <i class="fa-solid fa-venus text-4xl text-pink-400 mb-2"></i>
+                            <p class="font-bold text-xl" id="stat-female">...</p>
+                            <p class="text-xs text-slate-400">หญิง</p>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: IMAGE ANALYSIS -->
+        <section id="analyze" class="page-section hidden fade-in">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">วิเคราะห์ภาพทางการแพทย์ (AI)</h2>
+            
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- Upload Area -->
+                <div class="w-full lg:w-1/2">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <form id="analyze-form" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">เลือกประเภทการวิเคราะห์</label>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="image_type" value="xray" class="peer hidden" checked>
+                                        <div class="p-4 rounded-xl border-2 border-slate-200 text-center peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primaryDark transition-all hover:bg-slate-50">
+                                            <i class="fa-solid fa-x-ray text-2xl mb-2"></i>
+                                            <div class="font-medium">X-ray Scan</div>
+                                        </div>
+                                    </label>
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="image_type" value="blood" class="peer hidden">
+                                        <div class="p-4 rounded-xl border-2 border-slate-200 text-center peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primaryDark transition-all hover:bg-slate-50">
+                                            <i class="fa-solid fa-droplet text-2xl mb-2"></i>
+                                            <div class="font-medium">Blood Cell</div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">อัพโหลดรูปภาพ</label>
+                                <div class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors relative">
+                                    <input type="file" id="image-upload" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="previewImage(this)">
+                                    <div id="upload-placeholder">
+                                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-3"></i>
+                                        <p class="text-sm text-slate-500">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่</p>
+                                        <p class="text-xs text-slate-400 mt-1">รองรับ JPG, PNG</p>
+                                    </div>
+                                    <img id="image-preview" class="hidden max-h-64 mx-auto rounded-lg shadow-sm" alt="Preview">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-primary hover:bg-primaryDark text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm shadow-blue-200">
+                                <span id="analyze-btn-text">เริ่มการวิเคราะห์</span>
+                                <div id="analyze-loader" class="loader hidden border-white border-t-transparent"></div>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Result Area -->
+                <div class="w-full lg:w-1/2">
+                    <div id="analysis-result" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-full hidden">
+                        <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                            <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                                <i class="fa-solid fa-check"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-slate-800">ผลการวิเคราะห์</h3>
+                                <p class="text-xs text-slate-400" id="result-timestamp">...</p>
+                            </div>
+                        </div>
+
+                        <div id="xray-result-content" class="hidden space-y-4">
+                            <div class="text-center py-6">
+                                <p class="text-slate-500 mb-1">ผลการวินิจฉัยเบื้องต้น</p>
+                                <h2 class="text-3xl font-bold text-primaryDark" id="xray-class">Normal</h2>
+                                <div class="mt-4 inline-flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-full text-sm font-medium text-slate-600">
+                                    <i class="fa-solid fa-bullseye"></i>
+                                    <span id="xray-confidence">ความมั่นใจ 98.5%</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-50 p-4 rounded-xl">
+                                <h4 class="font-medium text-sm text-slate-500 mb-3">ความเป็นไปได้ทั้งหมด</h4>
+                                <div id="xray-details" class="space-y-2 text-sm"></div>
+                            </div>
+                        </div>
+
+                        <div id="blood-result-content" class="hidden space-y-4">
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div class="bg-red-50 p-4 rounded-xl text-center">
+                                    <p class="text-red-400 text-xs">Total Cells</p>
+                                    <h3 class="text-2xl font-bold text-red-600" id="blood-total">0</h3>
+                                </div>
+                                <div class="bg-blue-50 p-4 rounded-xl text-center">
+                                    <p class="text-blue-400 text-xs">Types Found</p>
+                                    <h3 class="text-2xl font-bold text-blue-600" id="blood-types-count">0</h3>
+                                </div>
+                            </div>
+                            <h4 class="font-medium text-sm text-slate-500">รายละเอียดการนับจำนวน</h4>
+                            <ul id="blood-details" class="space-y-2"></ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="analysis-empty" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-full flex flex-col items-center justify-center text-center text-slate-400">
+                        <i class="fa-solid fa-microscope text-6xl mb-4 text-slate-200"></i>
+                        <p>ยังไม่มีข้อมูลการวิเคราะห์</p>
+                        <p class="text-sm mt-1">กรุณาอัพโหลดภาพและกดปุ่มวิเคราะห์</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: CHATBOT -->
+        <section id="chat" class="page-section hidden fade-in h-[calc(100vh-8rem)]">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 h-full flex flex-col overflow-hidden">
+                <!-- Chat Header -->
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white z-10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-md shadow-blue-200">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-slate-700">AI Medical Doctor</h2>
+                            <p class="text-xs text-green-500 flex items-center gap-1">
+                                <span class="w-2 h-2 bg-green-500 rounded-full" id="chat-status-dot"></span> <span id="chat-status-text">Online</span>
+                            </p>
+                        </div>
+                    </div>
+                    <button onclick="clearChat()" class="text-slate-400 hover:text-red-500 transition-colors text-sm" title="ล้างประวัติ">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+
+                <!-- Chat Area -->
+                <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+                    <!-- Intro Message -->
+                    <div class="flex justify-start">
+                        <div class="chat-bubble chat-ai shadow-sm">
+                            สวัสดีครับ ผมเป็น AI ผู้ช่วยแพทย์ 🩺 <br>มีเรื่องสุขภาพอะไรที่อยากปรึกษา หรือสอบถามอาการเบื้องต้นไหมครับ?
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="p-4 bg-white border-t border-slate-100">
+                    <form id="chat-form" class="flex gap-2">
+                        <input type="text" id="chat-input" class="flex-1 bg-slate-100 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none" placeholder="พิมพ์ข้อความปรึกษา..." autocomplete="off">
+                        <button type="submit" class="bg-primary hover:bg-primaryDark text-white px-6 rounded-xl transition-colors shadow-sm shadow-blue-200">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: PATIENT SEARCH -->
+        <section id="patient" class="page-section hidden fade-in">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">ค้นหาข้อมูลผู้ป่วย</h2>
+
+            <!-- Search Bar -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6">
+                <form id="search-form" class="flex flex-col md:flex-row gap-4">
+                    <div class="flex-1 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="search-query" class="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="ค้นหาชื่อ, โรค, หรือหมู่เลือด...">
+                    </div>
+                    <select id="search-type" class="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-primary text-slate-600">
+                        <option value="name">ชื่อ-นามสกุล</option>
+                        <option value="condition">อาการ/โรค</option>
+                        <option value="blood_type">หมู่เลือด</option>
+                    </select>
+                    <button type="submit" class="bg-primary hover:bg-primaryDark text-white px-8 py-3 rounded-xl transition-colors font-medium shadow-sm shadow-blue-200">
+                        ค้นหา
+                    </button>
+                </form>
+            </div>
+
+            <!-- Result Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 text-slate-500 text-sm font-medium">
+                            <tr>
+                                <th class="p-4">ชื่อ-นามสกุล</th>
+                                <th class="p-4">อายุ</th>
+                                <th class="p-4">เพศ</th>
+                                <th class="p-4">หมู่เลือด</th>
+                                <th class="p-4">อาการ/โรค</th>
+                                <th class="p-4">วันที่รับเข้า</th>
+                                <th class="p-4">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patient-table-body" class="text-slate-700 divide-y divide-slate-100">
+                            <!-- Empty State -->
+                            <tr>
+                                <td colspan="7" class="p-8 text-center text-slate-400">
+                                    <i class="fa-solid fa-user-magnifying-glass text-4xl mb-3 block opacity-30"></i>
+                                    กรุณากรอกคำค้นหาเพื่อดูข้อมูล
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script Logic -->
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+        let navItems = document.querySelectorAll('.nav-item');
+        let sections = document.querySelectorAll('.page-section');
+        let isDemoMode = false;
+
+        // --- Notifications ---
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let icon = type === 'error' ? '<i class="fa-solid fa-triangle-exclamation text-red-500 text-xl"></i>' : '<i class="fa-solid fa-circle-info text-blue-500 text-xl"></i>';
+            let borderClass = type === 'error' ? 'border-red-500' : 'border-primary';
+
+            toast.className = `toast ${borderClass}`;
+            toast.innerHTML = `${icon} <span class="text-sm font-medium text-slate-700">${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // Remove after 3s
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease-in forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // --- Navigation ---
+        function showSection(sectionId) {
+            navItems.forEach(item => {
+                if(item.id === `nav-${sectionId}`) {
+                    item.classList.add('bg-secondary', 'text-primaryDark');
+                    item.classList.remove('text-slate-500');
+                } else {
+                    item.classList.remove('bg-secondary', 'text-primaryDark');
+                    item.classList.add('text-slate-500');
+                }
+            });
+
+            sections.forEach(sec => {
+                if(sec.id === sectionId) {
+                    sec.classList.remove('hidden');
+                } else {
+                    sec.classList.add('hidden');
+                }
+            });
+        }
+
+        // --- 1. Load Dashboard Data (With Mock Fallback) ---
+        async function loadDashboard() {
+            try {
+                // Try fetching with short timeout to fail fast if localhost is down
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                const response = await fetch(`${API_URL}/patient/stats`, { signal: controller.signal });
+                const data = await response.json();
+                clearTimeout(timeoutId);
+
+                if (data.success) {
+                    renderStats(data.stats);
+                    updateStatus(true);
+                } else {
+                    throw new Error("API returned failure");
+                }
+            } catch (error) {
+                console.warn("Backend not found, switching to Demo Mode:", error);
+                loadMockDashboard();
+                updateStatus(false);
+                showNotification("ไม่พบ Backend Server ระบบกำลังใช้งาน <b>Demo Mode</b>", "info");
+            }
+        }
+
+        function renderStats(stats) {
+            document.getElementById('stat-total').innerText = stats.total_patients.toLocaleString();
+            document.getElementById('stat-age').innerText = Math.round(stats.avg_age) + " ปี";
+            document.getElementById('stat-male').innerText = stats.gender['Male'] || 0;
+            document.getElementById('stat-female').innerText = stats.gender['Female'] || 0;
+
+            const sortedConditions = Object.entries(stats.conditions).sort((a, b) => b[1] - a[1]);
+            document.getElementById('stat-top-disease').innerText = sortedConditions[0][0];
+
+            const listContainer = document.getElementById('conditions-list');
+            listContainer.innerHTML = '';
+            sortedConditions.slice(0, 4).forEach(([name, count], index) => {
+                const percent = ((count / stats.total_patients) * 100).toFixed(1);
+                const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500'];
+                
+                listContainer.innerHTML += `
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-slate-600 font-medium">${name}</span>
+                            <span class="text-slate-400">${count} ราย</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2">
+                            <div class="${colors[index%4]} h-2 rounded-full" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function loadMockDashboard() {
+            isDemoMode = true;
+            const mockStats = {
+                total_patients: 1250,
+                avg_age: 42.5,
+                gender: { 'Male': 600, 'Female': 650 },
+                conditions: {
+                    'Hypertension': 350,
+                    'Diabetes': 280,
+                    'Asthma': 150,
+                    'Obesity': 120,
+                    'Cancer': 50
+                }
+            };
+            renderStats(mockStats);
+        }
+
+        function updateStatus(isOnline) {
+            const statusText = document.getElementById('api-status');
+            const statusDot = document.getElementById('status-dot');
+            const chatStatusDot = document.getElementById('chat-status-dot');
+            const chatStatusText = document.getElementById('chat-status-text');
+
+            if (isOnline) {
+                statusText.innerText = "Online";
+                statusText.className = "text-xs text-green-600 font-medium";
+                statusDot.className = "w-2 h-2 rounded-full bg-green-500";
+                
+                chatStatusDot.className = "w-2 h-2 bg-green-500 rounded-full";
+                chatStatusText.innerText = "Online";
+            } else {
+                statusText.innerText = "Demo Mode";
+                statusText.className = "text-xs text-orange-500 font-medium";
+                statusDot.className = "w-2 h-2 rounded-full bg-orange-500";
+
+                chatStatusDot.className = "w-2 h-2 bg-orange-500 rounded-full";
+                chatStatusText.innerText = "Demo Mode";
+            }
+        }
+
+        // --- 2. Image Analysis (With Mock Fallback) ---
+        function previewImage(input) {
+            const preview = document.getElementById('image-preview');
+            const placeholder = document.getElementById('upload-placeholder');
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        document.getElementById('analyze-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            const fileInput = document.getElementById('image-upload');
+            const typeInput = document.querySelector('input[name="image_type"]:checked').value;
+            
+            if (!fileInput.files[0]) {
+                showNotification("กรุณาเลือกไฟล์รูปภาพก่อนครับ", "error");
+                return;
+            }
+
+            // --- FIX START: Append data to formData ---
+            formData.append('file', fileInput.files[0]); // Important!
+            formData.append('type', typeInput);          // Important!
+            // --- FIX END ---
+
+            // UI Loading
+            document.getElementById('analyze-btn-text').innerText = "กำลังวิเคราะห์...";
+            document.getElementById('analyze-loader').classList.remove('hidden');
+            
+            try {
+                let data;
+                if (!isDemoMode) {
+                    try {
+                        const res = await fetch(`${API_URL}/analyze`, { method: 'POST', body: formData });
+                        
+                        // Handle server errors
+                        if (!res.ok) {
+                            const errorText = await res.text();
+                            console.error("Server Error:", errorText);
+                            throw new Error(`Server responded with ${res.status}`);
+                        }
+                        
+                        data = await res.json();
+                    } catch (err) { throw err; }
+                }
+
+                if (isDemoMode || !data) {
+                    // Simulate Delay for Demo
+                    await new Promise(r => setTimeout(r, 1500));
+                    data = getMockAnalysis(typeInput);
+                    showNotification("ใช้ผลลัพธ์จำลอง (Demo Result)", "info");
+                }
+
+                displayAnalysisResult(data, typeInput);
+
+            } catch (err) {
+                console.error(err);
+                // Fallback to demo if fetch fails
+                await new Promise(r => setTimeout(r, 1500));
+                const mockData = getMockAnalysis(typeInput);
+                displayAnalysisResult(mockData, typeInput);
+                showNotification("เชื่อมต่อไม่ได้ ใช้ผลลัพธ์จำลองแทน", "info");
+            } finally {
+                document.getElementById('analyze-btn-text').innerText = "เริ่มการวิเคราะห์";
+                document.getElementById('analyze-loader').classList.add('hidden');
+            }
+        });
+
+        function displayAnalysisResult(data, type) {
+            document.getElementById('analysis-empty').classList.add('hidden');
+            document.getElementById('analysis-result').classList.remove('hidden');
+            document.getElementById('result-timestamp').innerText = new Date().toLocaleString('th-TH');
+
+            document.getElementById('xray-result-content').classList.add('hidden');
+            document.getElementById('blood-result-content').classList.add('hidden');
+
+            if (data.type === 'xray') {
+                document.getElementById('xray-result-content').classList.remove('hidden');
+                document.getElementById('xray-class').innerText = data.result;
+                document.getElementById('xray-confidence').innerText = `ความมั่นใจ ${data.confidence}`;
+                
+                const details = document.getElementById('xray-details');
+                details.innerHTML = '';
+                for (const [cls, score] of Object.entries(data.all_predictions)) {
+                    details.innerHTML += `
+                        <div class="flex justify-between">
+                            <span>${cls}</span>
+                            <span class="font-medium text-slate-700">${score}</span>
+                        </div>`;
+                }
+            } else if (data.type === 'blood') {
+                document.getElementById('blood-result-content').classList.remove('hidden');
+                document.getElementById('blood-total').innerText = data.total_cells;
+                document.getElementById('blood-types-count').innerText = Object.keys(data.cell_counts).length;
+                
+                const list = document.getElementById('blood-details');
+                list.innerHTML = '';
+                for (const [cell, count] of Object.entries(data.cell_counts)) {
+                    list.innerHTML += `
+                        <li class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <span class="font-medium text-slate-700">${cell}</span>
+                            <span class="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">${count}</span>
+                        </li>`;
+                }
+            }
+        }
+
+        function getMockAnalysis(type) {
+            if (type === 'xray') {
+                return {
+                    success: true,
+                    type: 'xray',
+                    result: 'Pneumonia',
+                    confidence: '94.2%',
+                    all_predictions: { 'Pneumonia': '94.2%', 'Normal': '4.1%', 'Covid-19': '1.7%' }
+                };
+            } else {
+                return {
+                    success: true,
+                    type: 'blood',
+                    total_cells: 12,
+                    cell_counts: { 'RBC': 8, 'WBC': 3, 'Platelets': 1 },
+                };
+            }
+        }
+
+        // --- 3. Chatbot (With Mock Fallback) ---
+        const chatBox = document.getElementById('chat-box');
+        
+        function appendMessage(text, isUser) {
+            const div = document.createElement('div');
+            div.className = 'flex ' + (isUser ? 'justify-end' : 'justify-start');
+            div.innerHTML = `
+                <div class="chat-bubble ${isUser ? 'chat-user' : 'chat-ai shadow-sm'}">
+                    ${text}
+                </div>
+            `;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        document.getElementById('chat-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if(!message) return;
+
+            appendMessage(message, true);
+            input.value = '';
+
+            // Loading bubble
+            const loadingId = 'loading-' + Date.now();
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = loadingId;
+            loadingDiv.className = 'flex justify-start';
+            loadingDiv.innerHTML = `<div class="chat-bubble chat-ai shadow-sm"><div class="flex gap-1"><div class="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div><div class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div><div class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div></div></div>`;
+            chatBox.appendChild(loadingDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                if (isDemoMode) throw new Error("Demo Mode");
+
+                const formData = new FormData();
+                formData.append('message', message);
+                formData.append('session_id', sessionId);
+
+                const res = await fetch(`${API_URL}/chat`, { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                document.getElementById(loadingId).remove();
+
+                if(data.success) {
+                    const cleanText = data.response.replace(/\n/g, '<br>');
+                    appendMessage(cleanText, false);
+                } else {
+                    throw new Error("API Error");
+                }
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                // Mock Reply
+                setTimeout(() => {
+                    const mockReplies = [
+                        "อาการเบื้องต้นดูปกติครับ แต่ถ้าไม่ดีขึ้นแนะนำให้พบแพทย์ครับ (Demo Reply)",
+                        "การดื่มน้ำเยอะๆ และพักผ่อนให้เพียงพอจะช่วยบรรเทาอาการได้ครับ (Demo Reply)",
+                        "ผมเข้าใจครับ แนะนำให้สังเกตอาการอีก 1-2 วันครับ (Demo Reply)"
+                    ];
+                    const randomReply = mockReplies[Math.floor(Math.random() * mockReplies.length)];
+                    appendMessage(randomReply, false);
+                }, 500);
+            }
+        });
+
+        async function clearChat() {
+            if(confirm('ต้องการลบประวัติการสนทนาใช่ไหม?')) {
+                if(!isDemoMode) {
+                    try { await fetch(`${API_URL}/chat/clear/${sessionId}`); } catch(e){}
+                }
+                chatBox.innerHTML = '';
+                appendMessage("เริ่มบทสนทนาใหม่เรียบร้อยครับ", false);
+            }
+        }
+
+        // --- 4. Patient Search (With Mock Fallback) ---
+        document.getElementById('search-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = document.getElementById('search-query').value;
+            const type = document.getElementById('search-type').value;
+            const tbody = document.getElementById('patient-table-body');
+            
+            tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังค้นหา...</td></tr>';
+
+            try {
+                let results = [];
+                if (!isDemoMode) {
+                    const formData = new FormData();
+                    formData.append('search_query', query);
+                    formData.append('search_type', type);
+                    const res = await fetch(`${API_URL}/patient/search`, { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (data.success) results = data.results;
+                } else {
+                    throw new Error("Demo Mode");
+                }
+
+                renderTable(results);
+
+            } catch(err) {
+                // Mock Search Results
+                await new Promise(r => setTimeout(r, 800));
+                const mockResults = [
+                    { Name: "Somchai Jai-dee", Age: 45, Gender: "Male", "Blood Type": "O", "Medical Condition": "Hypertension", "Date of Admission": "2023-10-15", "Test Results": "Abnormal" },
+                    { Name: "Jane Doe (Demo)", Age: 32, Gender: "Female", "Blood Type": "A", "Medical Condition": "Asthma", "Date of Admission": "2023-11-02", "Test Results": "Normal" }
+                ];
+                renderTable(mockResults);
+                showNotification("แสดงผลการค้นหาจำลอง (Demo)", "info");
+            }
+        });
+
+        function renderTable(results) {
+            const tbody = document.getElementById('patient-table-body');
+            tbody.innerHTML = '';
+
+            if(results.length > 0) {
+                results.forEach(p => {
+                    let statusColor = p['Test Results'] === 'Normal' ? 'bg-green-100 text-green-700' : 
+                                      p['Test Results'] === 'Inconclusive' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                            <td class="p-4 font-medium text-slate-700">${p.Name}</td>
+                            <td class="p-4">${p.Age}</td>
+                            <td class="p-4">${p.Gender}</td>
+                            <td class="p-4"><span class="bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs font-bold">${p['Blood Type']}</span></td>
+                            <td class="p-4">${p['Medical Condition']}</td>
+                            <td class="p-4 text-sm text-slate-500">${p['Date of Admission']}</td>
+                            <td class="p-4"><span class="${statusColor} px-2 py-1 rounded-full text-xs font-medium">${p['Test Results']}</span></td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">ไม่พบข้อมูลที่ค้นหา</td></tr>';
+            }
+        }
+
+        // Init
+        loadDashboard();
+
+    </script>
+</body>
+</html>
